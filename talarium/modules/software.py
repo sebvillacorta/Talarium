@@ -9,7 +9,7 @@ config/software/github.conf (releases oficiales de GitHub).
 from ..context import Context
 from ..errors import CatalogError
 from ..core.github import install_github, remove_github
-from .common import install_packages, remove_packages
+from .common import install_packages, remove_packages, operation_completed
 
 
 def menu_software(ctx: Context) -> None:
@@ -74,8 +74,10 @@ def show_category(ctx: Context, cat: str) -> None:
                    ("back", "Volver")])
     if act == "install":
         if ui.yesno("Confirmar instalación", f"Se instalarán:\n{' '.join(chosen)}"):
-            install_packages(ctx, chosen)
-            ui.pause(2)
+            ok = install_packages(ctx, chosen)
+            if ok:
+                operation_completed(ctx, "Instalación completada",
+                                    f"Se instalaron correctamente:\n{' '.join(chosen)}")
     elif act == "remove":
         if ui.yesno("Confirmar eliminación", f"Se eliminarán:\n{' '.join(chosen)}"):
             remove_packages(ctx, chosen)
@@ -110,11 +112,14 @@ def menu_github(ctx: Context) -> None:
                    ("back", "Volver")])
     if act == "install":
         if ui.yesno("Confirmar descarga", f"Se descargarán e instalarán:\n{' '.join(chosen)}"):
+            ok = True
             for name in chosen:
                 entry = next((e for e in entries if e[0] == name), None)
                 if entry:
-                    install_github(ctx.runner, ctx.pm, entry)
-            ui.pause(2)
+                    ok = install_github(ctx.runner, ctx.pm, entry) and ok
+            if ok:
+                operation_completed(ctx, "Instalación completada",
+                                    f"Herramientas instaladas:\n{' '.join(chosen)}")
     elif act == "remove":
         for name in chosen:
             entry = next((e for e in entries if e[0] == name), None)

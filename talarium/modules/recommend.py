@@ -12,7 +12,7 @@ from pathlib import Path
 from ..context import Context
 from ..core.system import cores, gpu_vendor, is_systemd, is_ssd, mem_gb
 from ..errors import CommandError
-from .common import confirm_and_run
+from .common import confirm_and_run, operation_completed
 
 
 def build_recs(ctx: Context) -> list:
@@ -115,7 +115,8 @@ def menu_recomendaciones(ctx: Context) -> None:
     if ui.yesno("Aplicar recomendaciones", f"Se aplicarán:\n{' '.join(chosen)}"):
         for tag in chosen:
             _apply(ctx, tag)
-        ui.pause(2)
+        operation_completed(ctx, "Operación completada",
+                            f"Recomendaciones aplicadas:\n{' '.join(chosen)}")
 
 
 def _apply(ctx: Context, tag: str) -> None:

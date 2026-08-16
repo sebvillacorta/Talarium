@@ -20,6 +20,7 @@ from .core.catalog import Catalog
 from .core.packagemanager import factory as pm_factory
 from .core.runner import Runner
 from .core.system import detect_distro, require_supported
+from .errors import UserExit
 from .sudo import SudoSession, install_signal_cleanup
 from .ui import create_ui
 from .ui.banner import BANNER, FOOTER
@@ -127,6 +128,8 @@ class TalariumApp:
                     menu_backup(ctx)
                 elif sel == "help":
                     self.help_screen(ctx)
+            except UserExit:
+                break
             except Exception as exc:  # noqa: BLE001 - error mostrado al usuario
                 ctx.ui.alert("Error", str(exc) or exc.__class__.__name__)
         self.farewell()

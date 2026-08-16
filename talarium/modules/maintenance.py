@@ -10,7 +10,7 @@ from pathlib import Path
 from ..context import Context
 from ..core.system import is_systemd
 from ..errors import CommandError, SudoError
-from .common import ensure_sudo, remove_packages
+from .common import ensure_sudo, remove_packages, operation_completed
 
 
 def menu_sistema(ctx: Context) -> None:
@@ -163,4 +163,5 @@ def run_update_system(ctx: Context) -> None:
         print(">> Actualizando aplicaciones Flatpak...")
         ctx.runner.priv(["flatpak", "update", "-y"], timeout=3600)
     print("  Sistema actualizado.")
-    ui.pause(2)
+    operation_completed(ctx, "Actualización completada",
+                        "Todos los paquetes del sistema están actualizados.")

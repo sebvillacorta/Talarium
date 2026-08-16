@@ -3,7 +3,7 @@
 from typing import Callable, List, Sequence, TypeVar
 
 from ..context import Context
-from ..errors import CommandError, SudoError
+from ..errors import CommandError, SudoError, UserExit
 
 T = TypeVar("T")
 
@@ -92,3 +92,17 @@ def confirm_and_run(ctx: Context, title: str, text: str,
     except (SudoError, CommandError) as exc:
         ctx.ui.alert("Error", str(exc))
     ctx.ui.pause(2)
+
+
+def operation_completed(ctx: Context, title: str = "Instalación completada",
+                        message: str = "La operación finalizó correctamente.") -> None:
+    """Aviso de operación terminada con opción de volver al menú o salir.
+
+    Si el usuario elige "Salir", se lanza UserExit para que el bucle
+    principal de la aplicación termine de forma controlada.
+    """
+    sel = ctx.ui.menu(title, message,
+                      [("menu", "Regresar al menú principal"),
+                       ("exit", "Salir del programa")])
+    if sel == "exit":
+        raise UserExit()

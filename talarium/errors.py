@@ -32,3 +32,7 @@ class CatalogError(TalariumError):
 
 class NoPackagesSelected(TalariumError):
     """El usuario no marcó ningún paquete/opción (cancelación silenciosa)."""
+
+
+class UserExit(TalariumError):
+    """El usuario pidió salir del programa desde una operación completada."""
