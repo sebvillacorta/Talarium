@@ -28,6 +28,7 @@ def menu_software(ctx: Context) -> None:
         if not items:
             ui.alert("Software", f"La configuración está vacía:\n{ctx.catalog.software_file(ctx.distro.pm)}")
             return
+        items.append(("uninstall", "Desinstalar herramientas instaladas"))
         items.append(("back", "Volver al panel principal"))
         if has_github:
             items.append(("github", "Herramientas desde GitHub (releases oficiales)"))
@@ -39,6 +40,8 @@ def menu_software(ctx: Context) -> None:
             return
         if sel == "github":
             menu_github(ctx)
+        elif sel == "uninstall":
+            menu_uninstall(ctx)
         else:
             show_category(ctx, sel)
 
@@ -80,8 +83,57 @@ def show_category(ctx: Context, cat: str) -> None:
                                     f"Se instalaron correctamente:\n{' '.join(chosen)}")
     elif act == "remove":
         if ui.yesno("Confirmar eliminación", f"Se eliminarán:\n{' '.join(chosen)}"):
-            remove_packages(ctx, chosen)
-            ui.pause(2)
+            ok = remove_packages(ctx, chosen)
+            if ok:
+                operation_completed(ctx, "Desinstalación completada",
+                                    f"Se desinstalaron correctamente:\n{' '.join(chosen)}")
+
+
+def menu_uninstall(ctx: Context) -> None:
+    """Desinstala herramientas instaladas (catálogo nativo, Flatpak y GitHub)."""
+    ui = ctx.ui
+    items = []
+    seen = set()
+    for cat, pkgs in ctx.catalog.software(ctx.distro.pm).items():
+        for p in pkgs:
+            if p in seen:
+                continue
+            seen.add(p)
+            if ctx.pm.is_installed(p):
+                items.append((p, f"{cat} · {p}", False))
+
+    github = [e for e in ctx.catalog.github() if _github_installed(ctx, e[0])]
+    for name, *_rest in github:
+        if name in seen:
+            continue
+        seen.add(name)
+        items.append((name, f"github · {name}", False))
+
+    if not items:
+        ui.alert("Desinstalar", "No hay herramientas instaladas detectadas en el catálogo.")
+        return
+
+    chosen = ui.checklist("Desinstalar herramientas instaladas",
+                          "Marca con ESPACIO lo que quieras ELIMINAR", items)
+    if not chosen:
+        ui.alert("Desinstalar", "No seleccionaste ninguna herramienta.")
+        return
+    if not ui.yesno("Confirmar eliminación", f"Se desinstalarán:\n{' '.join(chosen)}"):
+        return
+
+    gh_names = {e[0]: e for e in ctx.catalog.github()}
+    gh_chosen = [n for n in chosen if n in gh_names]
+    native_chosen = [n for n in chosen if n not in gh_names]
+    native_chosen += [n for n in gh_chosen if ctx.pm.is_installed(n)]
+
+    ok = True
+    if native_chosen:
+        ok = remove_packages(ctx, native_chosen) and ok
+    for n in gh_chosen:
+        remove_github(n, gh_names[n][3])
+    if ok:
+        operation_completed(ctx, "Desinstalación completada",
+                            f"Se desinstalaron correctamente:\n{' '.join(chosen)}")
 
 
 # ================================================================== GitHub
@@ -124,7 +176,8 @@ def menu_github(ctx: Context) -> None:
         for name in chosen:
             entry = next((e for e in entries if e[0] == name), None)
             remove_github(name, entry[3] if entry else name)
-        ui.pause(2)
+        operation_completed(ctx, "Desinstalación completada",
+                            f"Binarios eliminados:\n{' '.join(chosen)}")
 
 
 def _github_installed(ctx: Context, name: str) -> bool:

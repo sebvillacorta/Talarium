@@ -71,7 +71,9 @@ class PackageManager:
 
     def remove(self, pkgs: Sequence[str]) -> None:
         pend = [p for p in pkgs if not p.startswith(("flatpak:", "aur:"))]
+        pend = [p for p in pend if self.is_installed(p)]
         if not pend:
+            print("  Nada que eliminar (no instalado).")
             return
         print(f">> Eliminando: {' '.join(pend)}")
         proc = self.r.priv(self.remove_cmd + pend, timeout=1800)
