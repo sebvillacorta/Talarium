@@ -58,7 +58,8 @@ class DialogUI(UI):
                 "helpline=white,black;sellistbox=white,black;actsellistbox=black,white"
             )
         try:
-            return subprocess.run(argv, env=env, text=True, timeout=timeout)
+            return subprocess.run(argv, env=env, text=True,
+                                  capture_output=True, timeout=timeout)
         except (OSError, subprocess.SubprocessError) as exc:
             raise _BackendFailure(f"Fallo al ejecutar {self.engine}: {exc}") from exc
 
