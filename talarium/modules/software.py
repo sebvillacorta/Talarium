@@ -56,10 +56,26 @@ def show_category(ctx: Context, cat: str) -> None:
 
     descs = ctx.catalog.descriptions()
     items = []
+    unavailable = set()
     for p in pkgs:
         installed = ctx.pm.is_installed(p)
         label = descs.get(p, (p, ""))[0]
-        items.append((p, f"[{'INSTALADO' if installed else 'disponible'}] {label}", installed))
+        if installed:
+            mark = "INSTALADO"
+        elif p.startswith("flatpak:"):
+            if ctx.flatpak.available:
+                mark = "disponible"
+            else:
+                mark = "NO DISPONIBLE"
+                unavailable.add(p)
+        elif p.startswith("aur:"):
+            mark = "disponible"
+        elif ctx.pm.available(p) is False:
+            mark = "NO DISPONIBLE"
+            unavailable.add(p)
+        else:
+            mark = "disponible"
+        items.append((p, f"[{mark}] {label}", installed))
 
     chosen = ui.checklist(f"Software: {cat}",
                           "Marca con ESPACIO los paquetes (los ya instalados vienen marcados)",
@@ -76,6 +92,15 @@ def show_category(ctx: Context, cat: str) -> None:
                    ("remove", "ELIMINAR los paquetes seleccionados"),
                    ("back", "Volver")])
     if act == "install":
+        blocked = [p for p in chosen if p in unavailable]
+        if blocked:
+            if not ui.yesno("Aviso",
+                            f"No están disponibles en los repos de {ctx.distro.name}:\n"
+                            f"{' '.join(blocked)}\n\n¿Instalar solo los disponibles?"):
+                return
+            chosen = [p for p in chosen if p not in blocked]
+            if not chosen:
+                return
         if ui.yesno("Confirmar instalación", f"Se instalarán:\n{' '.join(chosen)}"):
             ok = install_packages(ctx, chosen)
             if ok:

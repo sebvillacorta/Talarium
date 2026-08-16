@@ -106,7 +106,7 @@ def require_supported(d: DistroInfo) -> None:
     if not d.pm:
         raise UnsupportedDistro(
             f"Tu distribución ({d.name}) no está soportada todavía.\n"
-            "Gestores soportados: dnf, pacman, apt, zypper, xbps."
+            "Gestores soportados: dnf, pacman, apt, zypper, xbps, apk."
         )
 
 

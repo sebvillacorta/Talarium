@@ -7,6 +7,11 @@ actualizar, limpiar...). Los prefijos de paquetes se resuelven aquí:
 - 'aur:NOMBRE' -> operación vía helper AUR (paru/yay, sólo pacman).
 - resto        -> paquete nativo del gestor activo.
 
+Disponibilidad (available/available_batch): consulta los repos de la
+distro activa para saber si un paquete existe. Devuelve True/False, o
+None cuando no se puede determinar (sin metadatos, sin red, error), que
+se trata como "disponible" para no penalizar al usuario.
+
 Comportamiento defensivo:
 - is_installed() nunca falla: devuelve False ante cualquier error.
 - install() omite paquetes ya instalados y reintenta uno a uno los que
@@ -14,7 +19,8 @@ Comportamiento defensivo:
 - Cada operación comprueba el código de salida y avisa con claridad.
 """
 
-from typing import List, Sequence
+import re
+from typing import Dict, List, Optional, Sequence
 
 from ..errors import CommandError
 from ..core.runner import Runner
@@ -33,6 +39,7 @@ class PackageManager:
 
     def __init__(self, runner: Runner) -> None:
         self.r = runner
+        self._avail_cache: Dict[str, Optional[bool]] = {}
 
     # ------------------------------------------------------------- consultas
     def is_installed(self, pkg: str) -> bool:
@@ -44,6 +51,14 @@ class PackageManager:
 
     def list_installed(self) -> List[str]:
         return []
+
+    def available(self, pkg: str) -> Optional[bool]:
+        """True si existe en los repos, False si no, None si no se puede saber."""
+        return None
+
+    def available_batch(self, pkgs: Sequence[str]) -> Dict[str, Optional[bool]]:
+        """Consulta la disponibilidad de varios paquetes (usa la caché)."""
+        return {p: self.available(p) for p in pkgs}
 
     # ----------------------------------------------------------- operaciones
     def install(self, pkgs: Sequence[str]) -> None:
@@ -123,6 +138,27 @@ class DnfPM(PackageManager):
     def font_packages(self) -> List[str]:
         return ["jetbrains-mono-fonts", "fira-code-fonts"]
 
+    def available_batch(self, pkgs: Sequence[str]) -> Dict[str, Optional[bool]]:
+        """dnf repoquery en una sola llamada; parsea los nombres de la salida."""
+        pend = [p for p in pkgs if p not in self._avail_cache]
+        for p in pend:
+            self._avail_cache[p] = None
+        if pend:
+            try:
+                proc = self.r.run(["dnf", "repoquery", "--quiet"] + pend,
+                                  capture=True, timeout=60)
+            except Exception:  # noqa: BLE001 - sin metadatos/red: desconocido
+                return dict(self._avail_cache)
+            if proc.returncode == 0:
+                found = set()
+                for line in (proc.stdout or "").splitlines():
+                    m = re.match(r"^(.*?)-[0-9]", line)
+                    if m:
+                        found.add(m.group(1))
+                for p in pend:
+                    self._avail_cache[p] = p in found
+        return dict(self._avail_cache)
+
 
 # ------------------------------------------------------------------ pacman
 class PacmanPM(PackageManager):
@@ -152,6 +188,21 @@ class PacmanPM(PackageManager):
     def font_packages(self) -> List[str]:
         return ["ttf-jetbrains-mono", "ttf-fira-code"]
 
+    def available(self, pkg: str) -> Optional[bool]:
+        if pkg in self._avail_cache:
+            return self._avail_cache[pkg]
+        try:
+            proc = self.r.run(["pacman", "-Si", pkg], capture=True, timeout=30)
+        except Exception:  # noqa: BLE001 - sin base sincronizada: desconocido
+            return None
+        if (proc.stdout or "").strip():
+            self._avail_cache[pkg] = True
+        elif "was not found" in (proc.stderr or ""):
+            self._avail_cache[pkg] = False
+        else:
+            return None
+        return self._avail_cache[pkg]
+
 
 # ---------------------------------------------------------------------- apt
 class AptPM(PackageManager):
@@ -171,6 +222,21 @@ class AptPM(PackageManager):
 
     def font_packages(self) -> List[str]:
         return ["fonts-jetbrains-mono", "fonts-firacode"]
+
+    def available(self, pkg: str) -> Optional[bool]:
+        if pkg in self._avail_cache:
+            return self._avail_cache[pkg]
+        try:
+            proc = self.r.run(["apt-cache", "show", pkg], capture=True, timeout=30)
+        except Exception:  # noqa: BLE001
+            return None
+        if (proc.stdout or "").strip():
+            self._avail_cache[pkg] = True
+        elif proc.returncode == 100:
+            self._avail_cache[pkg] = False
+        else:
+            return None
+        return self._avail_cache[pkg]
 
 
 # -------------------------------------------------------------------- zypper
@@ -199,6 +265,22 @@ class ZypperPM(PackageManager):
     def font_packages(self) -> List[str]:
         return ["jetbrains-mono-fonts", "fira-code-fonts"]
 
+    def available(self, pkg: str) -> Optional[bool]:
+        if pkg in self._avail_cache:
+            return self._avail_cache[pkg]
+        try:
+            proc = self.r.run(["zypper", "se", "-x", "--no-headings", pkg],
+                              capture=True, timeout=30)
+        except Exception:  # noqa: BLE001
+            return None
+        if (proc.stdout or "").strip():
+            self._avail_cache[pkg] = True
+        elif proc.returncode == 0:
+            self._avail_cache[pkg] = False
+        else:
+            return None
+        return self._avail_cache[pkg]
+
 
 # --------------------------------------------------------------------- xbps
 class XbpsPM(PackageManager):
@@ -212,12 +294,71 @@ class XbpsPM(PackageManager):
     search_cmd = ["xbps-query", "-Rs"]
     query_cmd = ["xbps-query"]
 
+    def list_installed(self) -> List[str]:
+        out = self.r.check_output(["xbps-query", "-l"], timeout=120)
+        pkgs = []
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0].startswith("ii"):
+                pkgs.append(parts[1].rsplit("-", 1)[0])
+        return sorted(pkgs)
+
+    def available(self, pkg: str) -> Optional[bool]:
+        if pkg in self._avail_cache:
+            return self._avail_cache[pkg]
+        try:
+            proc = self.r.run(["xbps-query", "-Rs", pkg], capture=True, timeout=30)
+        except Exception:  # noqa: BLE001
+            return None
+        if (proc.stdout or "").strip():
+            self._avail_cache[pkg] = True
+        elif proc.returncode in (0, 1):
+            self._avail_cache[pkg] = False
+        else:
+            return None
+        return self._avail_cache[pkg]
+
+
+# ---------------------------------------------------------------------- apk
+class ApkPM(PackageManager):
+    name = "apk"
+    install_cmd = ["apk", "add"]
+    remove_cmd = ["apk", "del"]
+    update_cmd = ["apk", "update"]
+    upgrade_cmd = ["apk", "upgrade"]
+    autoremove_cmd = ["apk", "cache", "clean"]
+    clean_cmd = ["apk", "cache", "clean"]
+    search_cmd = ["apk", "search"]
+    query_cmd = ["apk", "info", "-e"]
+
+    def list_installed(self) -> List[str]:
+        return sorted(l for l in self.r.check_output(["apk", "info", "-q"], timeout=120)
+                      .splitlines() if l.strip())
+
+    def font_packages(self) -> List[str]:
+        return ["font-jetbrainsmono-ttf", "font-fira-code-ttf"]
+
+    def available(self, pkg: str) -> Optional[bool]:
+        if pkg in self._avail_cache:
+            return self._avail_cache[pkg]
+        try:
+            proc = self.r.run(["apk", "search", "-e", pkg], capture=True, timeout=30)
+        except Exception:  # noqa: BLE001 - sin índice de repos: desconocido
+            return None
+        if (proc.stdout or "").strip():
+            self._avail_cache[pkg] = True
+        elif proc.returncode in (0, 1):
+            self._avail_cache[pkg] = False
+        else:
+            return None
+        return self._avail_cache[pkg]
+
 
 def factory(runner: Runner, pm_name: str) -> PackageManager:
     """Crea el gestor de paquetes para el nombre dado."""
     classes = {
         "dnf": DnfPM, "pacman": PacmanPM, "apt": AptPM,
-        "zypper": ZypperPM, "xbps": XbpsPM,
+        "zypper": ZypperPM, "xbps": XbpsPM, "apk": ApkPM,
     }
     cls = classes.get(pm_name)
     if cls is None:
