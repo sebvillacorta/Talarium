@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "talarium"
+version = "1.0.0"
+description = "Gestor de sistema para Linux: software, limpieza, ajustes visuales, recomendaciones y copias de seguridad."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "sebvillacorta (RevOst)" }]
+keywords = ["linux", "gestor", "sistema", "dnf", "pacman", "apt", "zypper", "xbps"]
+
+[project.scripts]
+talarium = "talarium.cli:main"
+
+[tool.setuptools]
+packages = [
+    "talarium",
+    "talarium.core",
+    "talarium.ui",
+    "talarium.modules",
+]

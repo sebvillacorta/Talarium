@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Talarium - lanzador (bootstrap de Python)
+#
+# A diferencia de la versión en bash, el programa es un paquete Python
+# (talarium/). Este script sólo localiza el intérprete y ejecuta el módulo,
+# de modo que NUNCA se necesitan permisos de ejecución sobre los archivos
+# del programa: si no puedes ejecutar este lanzador, usa:
+#
+#     python3 -m talarium   (desde el directorio del proyecto)
+# =============================================================================
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# 1) Localiza un intérprete de Python 3.
+PY=""
+for cand in python3 python; do
+  if command -v "$cand" >/dev/null 2>&1 && "$cand" -c 'import sys; sys.exit(0 if sys.version_info >= (3,8) else 1)' 2>/dev/null; then
+    PY="$cand"
+    break
+  fi
+done
+
+if [[ -z "$PY" ]]; then
+  echo "Error: Talarium necesita Python 3.8+." >&2
+  echo "Instálalo con tu gestor:  sudo dnf install python3   (o apt/pacman/zypper)" >&2
+  exit 1
+fi
+
+export TALARIUM_ROOT="$ROOT_DIR"
+exec "$PY" -m talarium "$@"
