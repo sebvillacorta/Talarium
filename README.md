@@ -43,12 +43,18 @@ recomienda optimizaciones según tu equipo y respalda tu configuración.
 - **Software por categorías** — listas editables por gestor de paquetes
   (`config/software/*.conf`), con perfiles para informática, desarrollo,
   creación de contenido, diseño gráfico, oficina y más.
+- **Disponibilidad real por distro** — Talarium consulta los repos de tu
+  distro y marca cada paquete como `INSTALADO`, `disponible` o
+  `NO DISPONIBLE`, avisando antes de instalar si elegiste alguno que no
+  existe en tus repos.
+- **Desinstalar herramientas instaladas** — pantalla dedicada que detecta lo
+  instalado (nativo, Flatpak y GitHub) y permite eliminarlo con confirmación.
 - **Flatpak** — los paquetes con prefijo `flatpak:ID` se instalan desde Flathub.
 - **Herramientas desde GitHub** — descarga e instala binarios de los *releases*
   oficiales de GitHub (eza, bat, lazygit, gh, Obsidian, VS Code…), eligiendo el
   formato según tu gestor (`.rpm`, `.deb`, `.pkg.tar`, AppImage, tar.gz…).
 - **Desbloat y mantenimiento** — paquetes huérfanos, cachés, journal, limpieza
-  de `dnf`/`apt`/`pacman`/`zypper`/`xbps`.
+  de `dnf`/`apt`/`pacman`/`zypper`/`xbps`/`apk`.
 - **Ajustes visuales** — GNOME, KDE y XFCE: fuentes, tema, extensiones, TRIM,
   instalación de Zsh.
 - **Recomendaciones** — según tu distro, RAM, CPU y GPU (incluye drivers
@@ -63,10 +69,11 @@ recomienda optimizaciones según tu equipo y respalda tu configuración.
 | Distribución | Gestor | Estado |
 |---|---|---|
 | Fedora / RHEL / CentOS / Rocky / AlmaLinux / Nobara | `dnf` | ✅ |
-| Arch / Manjaro / EndeavourOS | `pacman` (+AUR) | ✅ |
-| Debian / Ubuntu / Mint | `apt` | ✅ |
+| Arch / Manjaro / EndeavourOS / Garuda / CachyOS | `pacman` (+AUR) | ✅ |
+| Debian / Ubuntu / Mint / Pop!_OS / elementary / Zorin | `apt` | ✅ |
 | openSUSE | `zypper` | ✅ |
 | Void | `xbps` | ✅ |
+| Alpine | `apk` | ✅ |
 
 ## Requisitos
 
@@ -128,8 +135,8 @@ categoria: paquete1 paquete2 flatpak:com.ejemplo.App
 ```
 
 - `config/software/dnf.conf` · `apt.conf` · `pacman.conf` · `zypper.conf`
-  — paquetes por categoría y gestor. El prefijo `flatpak:` indica que el
-  paquete se instala desde Flathub.
+  · `xbps.conf` · `apk.conf` — paquetes por categoría y gestor. El prefijo
+  `flatpak:` indica que el paquete se instala desde Flathub.
 - `config/software/descriptions.conf` — descripciones breves de aplicaciones,
   con formato `etiqueta|Nombre visible|Descripción`.
 - `config/software/github.conf` — herramientas de GitHub, con formato:
@@ -169,6 +176,7 @@ config/
   software/descriptions.conf  Descripciones de aplicaciones
   debloat/*.conf           Listas de bloat (editables)
   theme/dialog.mono        Tema monocromo para dialog
+tests/                     Suite de tests (sistema, distros, disponibilidad)
 docs/architecture.md       Arquitectura y análisis de fallas
 ```
 
@@ -178,8 +186,12 @@ las fallas cubiertas y las decisiones de diseño.
 ## Contribuir
 
 Las aportaciones son bienvenidas: abre un *issue* o un *pull request*.
-El código se valida con `python3 -m compileall` y se revisa con análisis
-estático antes de cada push.
+El código se valida con:
+
+```bash
+python3 -m compileall -q talarium   # sintaxis de todos los módulos
+python3 -m unittest discover -s tests   # suite completa (sistema, distros, ...)
+```
 
 ## Licencia
 
