@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Tests (compileall + unittest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Sintaxis de todos los módulos
+        run: python3 -m compileall -q talarium
+
+      - name: Suite completa de tests
+        run: python3 -m unittest discover -s tests -v
