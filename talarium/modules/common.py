@@ -17,12 +17,17 @@ def ensure_sudo(ctx: Context) -> bool:
         return False
 
 
-def run_privileged(ctx: Context, fn: Callable[[], T]) -> T | None:
-    """Ejecuta fn con sudo ya validado; muestra el error sin abortar la sesión."""
+def run_privileged(ctx: Context, fn: Callable[[], T]) -> T | bool | None:
+    """Ejecuta fn con sudo ya validado; muestra el error sin abortar la sesión.
+
+    Devuelve True si fn tuvo éxito sin devolver valor (None), el valor
+    devuelto si lo hay, o None si falló la validación de sudo o la propia fn.
+    """
     if not ensure_sudo(ctx):
         return None
     try:
-        return fn()
+        result = fn()
+        return True if result is None else result
     except (SudoError, CommandError) as exc:
         ctx.ui.alert("Error", str(exc))
         return None
