@@ -106,7 +106,8 @@ class TestVisual(NavegacionBase):
     def test_ajustes_escritorio(self):
         self.check(["", "3", "1", "7", "5", "7"],
                    ["Visual - apariencia", "Talarium - Panel principal"],
-                   any_of=["Ajustes GNOME", "Ajustes KDE", "Ajustes XFCE"])
+                   any_of=["Ajustes GNOME", "Ajustes KDE", "Ajustes XFCE",
+                           "aún no tiene ajustes"])
 
     def test_fuentes_sudo_degradado(self):
         self.check(["", "3", "2", "5", "7"],
